@@ -61,6 +61,7 @@ describe('EngineTransactions', () => {
     let mockParticipant;
     let mockEventService;
     let mockIdentity;
+    let mockOrder;
 
     beforeEach(() => {
         mockContainer = sinon.createStubInstance(Container);
@@ -283,6 +284,24 @@ describe('EngineTransactions', () => {
                     mockTransactionHandler1.execute.args[0][1].should.equal(mockResolvedTransaction);
                     sinon.assert.calledOnce(mockRegistry.add);
                     sinon.assert.calledWith(mockRegistry.add, mockTransaction);
+                });
+        });
+
+        it('should execute the transaction with an asset', () => {
+            mockCompiledScriptBundle.execute.resolves(1);
+            mockOrder = {$type: 'Order', $identifier: '001'};
+            fakeJSON.order = mockOrder;
+            mockTransaction.order = mockOrder;
+            return engine.invoke(mockContext, 'submitTransaction', [ JSON.stringify(fakeJSON)])
+                .then(() => {
+                    sinon.assert.calledOnce(mockCompiledScriptBundle.execute);
+                    mockCompiledScriptBundle.execute.args[0][0].should.equal(mockApi);
+                    mockCompiledScriptBundle.execute.args[0][1].should.equal(mockResolvedTransaction);
+                    sinon.assert.calledOnce(mockRegistry.add);
+                    sinon.assert.calledWith(mockRegistry.add, mockTransaction);
+                    sinon.assert.calledOnce(mockContext.setTransaction);
+                    sinon.assert.calledWith(mockContext.setTransaction, mockTransaction);
+                    sinon.assert.calledOnce(mockContext.clearTransaction);
                 });
         });
 
