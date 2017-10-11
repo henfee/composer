@@ -8,7 +8,7 @@ import { AlertService } from '../basic-modals/alert.service';
 import { IdentityCardService } from './identity-card.service';
 import { AdminService } from './admin.service';
 import { ClientService } from './client.service';
-import { BusinessNetworkDefinition, AclFile } from 'composer-common';
+import { BusinessNetworkDefinition, AclFile, Serializer, Factory, ModelManager } from 'composer-common';
 
 import * as sinon from 'sinon';
 import * as chai from 'chai';
@@ -41,6 +41,12 @@ describe('SampleBusinessNetworkService', () => {
         aclFileMock = sinon.createStubInstance(AclFile);
         alertMock = sinon.createStubInstance(AlertService);
         businessNetworkMock = sinon.createStubInstance(BusinessNetworkDefinition);
+
+        const modelManager = new ModelManager();
+        const factory = new Factory(modelManager);
+        const serializer = new Serializer(factory, modelManager);
+        businessNetworkMock.getFactory.returns(factory);
+        businessNetworkMock.getSerializer.returns(serializer);
 
         alertMock.busyStatus$ = {next: sinon.stub()};
 
@@ -148,11 +154,43 @@ describe('SampleBusinessNetworkService', () => {
         })));
     });
 
+    describe('generateBootstrapTransactions', () => {
+        const sanitize = (result) => {
+            result.forEach((tx) => {
+                delete tx.timestamp;
+                delete tx.transactionId;
+                return tx;
+            });
+        };
+
+        it('should generate bootstrap transactions for the specified identity name', fakeAsync(inject([SampleBusinessNetworkService], (service: SampleBusinessNetworkService) => {
+            const bootstrapTransactions = service.generateBootstrapTransactions(businessNetworkMock, 'doggoship1');
+            sanitize(bootstrapTransactions);
+            bootstrapTransactions.should.deep.equal([
+                {
+                    $class: 'org.hyperledger.composer.system.AddParticipant',
+                    resources: [
+                        {
+                            $class: 'org.hyperledger.composer.system.NetworkAdmin',
+                            participantId: 'doggoship1'
+                        }
+                    ],
+                    targetRegistry: 'resource:org.hyperledger.composer.system.ParticipantRegistry#org.hyperledger.composer.system.NetworkAdmin'
+                },
+                {
+                    $class: 'org.hyperledger.composer.system.IssueIdentity',
+                    participant: 'resource:org.hyperledger.composer.system.NetworkAdmin#doggoship1',
+                    identityName: 'doggoship1'
+                }
+            ]);
+        })));
+    });
+
     describe('deployBusinessNetwork', () => {
         it('should deploy the business network definition', fakeAsync(inject([SampleBusinessNetworkService], (service: SampleBusinessNetworkService) => {
             let metaData = {getPackageJson: sinon.stub().returns({})};
             businessNetworkMock.getMetadata.returns(metaData);
-            let buildStub = sinon.stub(service, 'buildNetwork').returns({getName: sinon.stub()});
+            let buildStub = sinon.stub(service, 'buildNetwork').returns({getName: sinon.stub().returns('myNetwork')});
             adminMock.connectWithoutNetwork.returns(Promise.resolve());
             adminMock.install.returns(Promise.resolve());
             adminMock.start.returns(Promise.resolve());
@@ -168,9 +206,13 @@ describe('SampleBusinessNetworkService', () => {
 
             identityCardMock.setCurrentIdentityCard.returns(Promise.resolve());
 
+            identityCardMock.createIdentityCard.returns(Promise.resolve('newCardRef'));
+
             clientMock.refresh.returns(Promise.resolve());
 
-            service.deployBusinessNetwork(businessNetworkMock, 'myNetwork', 'myDescription');
+            service.deployBusinessNetwork(businessNetworkMock, 'myNetwork', 'myDescription').then((cardRef) => {
+                cardRef.should.equal('newCardRef');
+            });
 
             tick();
 
@@ -185,9 +227,9 @@ describe('SampleBusinessNetworkService', () => {
 
             adminMock.install.should.have.been.called;
             adminMock.start.should.have.been.called;
+            adminMock.start.should.have.been.calledWith(sinon.match.object, sinon.match.object);
 
-            clientMock.refresh.should.have.been.called;
-            clientMock.reset.should.have.been.called;
+            identityCardMock.createIdentityCard.should.have.been.calledWith('admin', 'myNetwork', 'adminpw', {name: 'myProfile'});
 
             alertMock.busyStatus$.next.should.have.been.calledWith(null);
         })));

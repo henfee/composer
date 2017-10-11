@@ -14,6 +14,7 @@ import { ImportIdentityComponent } from './import-identity';
 import { IdCard } from 'composer-common';
 
 import { saveAs } from 'file-saver';
+import { SampleBusinessNetworkService } from '../services/samplebusinessnetwork.service';
 
 @Component({
     selector: 'app-login',
@@ -44,7 +45,8 @@ export class LoginComponent implements OnInit {
                 private modalService: NgbModal,
                 private drawerService: DrawerService,
                 private alertService: AlertService,
-                private configService: ConfigService) {
+                private configService: ConfigService,
+                private sampleBusinessNetworkService: SampleBusinessNetworkService) {
 
     }
 
@@ -139,6 +141,34 @@ export class LoginComponent implements OnInit {
             });
     }
 
+    deploySample(connectionProfileRef): Promise<boolean | void> {
+        let peerCardRef = this.identityCardService.getIdentityCardRefsWithProfileAndRole(connectionProfileRef, 'PeerAdmin')[0];
+
+        this.identityCardService.setCurrentIdentityCard(peerCardRef);
+
+        this.alertService.busyStatus$.next({
+            title: 'Getting sample network',
+            force: true
+        });
+        return this.sampleBusinessNetworkService.getSampleList()
+            .then((sampleList) => {
+                let chosenSample = sampleList[0];
+
+                return this.sampleBusinessNetworkService.getChosenSample(chosenSample);
+
+            })
+            .then((businessNetworkDefinition) => {
+                return this.sampleBusinessNetworkService.deployBusinessNetwork(businessNetworkDefinition, 'my-basic-sample', 'The Composer basic sample network');
+            })
+            .then((cardRef: string) => {
+                this.alertService.busyStatus$.next({
+                    title: 'Connecting to network',
+                    force: true
+                });
+                return this.changeIdentity(cardRef);
+            });
+    }
+
     editConnectionProfile(connectionProfile): void {
         this.showSubScreen = true;
         this.editingConnectionProfile = connectionProfile;
@@ -200,7 +230,7 @@ export class LoginComponent implements OnInit {
     importIdentity() {
         this.drawerService.open(ImportIdentityComponent).result.then((result) => {
             return this.identityCardService.addIdentityCard(result);
-        }).then((cardRef) => {
+        }).then((cardRef: string) => {
             this.alertService.successStatus$.next({
                 title: 'ID Card imported',
                 text: 'The ID card ' + this.identityCardService.getIdentityCard(cardRef).getUserName() + ' was successfully imported',
