@@ -102,6 +102,8 @@ asset HistorianRecord identified by transactionId {
   --> Identity    identityUsed         optional
   o Event[]       eventsEmitted        optional
   o DateTime      transactionTimestamp
+  o String        assetType
+  o String        assetID
 }
 
 // -----------------------------------------------------------------------------

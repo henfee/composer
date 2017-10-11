@@ -280,6 +280,19 @@ describe('EngineTransactions', () => {
                 });
         });
 
+        it('should execute the transaction using a user handler with an asset', () => {
+            mockTransaction.order = {type: 'Order', $identifier: '001'};
+            mockCompiledScriptBundle.execute.resolves(1);
+            return engine.invoke(mockContext, 'submitTransaction', [ JSON.stringify(fakeJSON)])
+                .then(() => {
+                    sinon.assert.calledOnce(mockCompiledScriptBundle.execute);
+                    mockCompiledScriptBundle.execute.args[0][0].should.equal(mockApi);
+                    mockCompiledScriptBundle.execute.args[0][1].should.equal(mockResolvedTransaction);
+                    sinon.assert.calledOnce(mockRegistry.add);
+                    sinon.assert.calledWith(mockRegistry.add, mockTransaction);
+                });
+        });
+
     });
 
 });

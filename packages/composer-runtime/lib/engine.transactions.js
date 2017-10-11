@@ -172,6 +172,17 @@ class EngineTransactions {
         record.transactionInvoked = factory.newRelationship(transaction.getNamespace(),transaction.getType(),transaction.getIdentifier());
         record.transactionTimestamp = transaction.timestamp;
         record.transactionType = transaction.getFullyQualifiedType();
+        record.assetType = 'not an Asset';
+        record.assetID = '-1';
+        if ((typeof(transaction.order) !== 'undefined') && (transaction.order !== null)) {
+            record.assetType = 'Order';
+            record.assetID = transaction.order.$identifier;
+        }
+        else {
+            record.assetType = 'not Asset';
+            record.assetId = null;
+        }
+        console.log('transaction type: '+record.transactionType+' asset Type: '+record.assetType+' id: '+record.assetID);
 
         // Get the events that are generated - getting these as Resources
         let evtSvr = context.getEventService();
